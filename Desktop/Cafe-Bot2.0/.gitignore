@@ -1,0 +1,27 @@
+# Secrets — never commit
+.env
+
+# Customer order data (contains PII: names, addresses, phone numbers)
+data/orders.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

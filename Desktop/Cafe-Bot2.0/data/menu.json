@@ -1,0 +1,196 @@
+{
+  "categories": ["hot_drinks", "cold_drinks", "pastries", "savoury", "sweets"],
+  "items": [
+    {
+      "id": "d001",
+      "category": "hot_drinks",
+      "name": "Espresso",
+      "description": "A rich, concentrated shot of coffee with a smooth crema on top.",
+      "price": 2.50,
+      "sizes": [
+        { "label": "Single", "price_modifier": 0.00 },
+        { "label": "Double", "price_modifier": 0.75 }
+      ],
+      "allergens": [],
+      "dietary": { "vegan": true, "vegetarian": true, "gluten_free": true },
+      "available": true
+    },
+    {
+      "id": "d002",
+      "category": "hot_drinks",
+      "name": "Latte",
+      "description": "Espresso with steamed milk and a light layer of foam.",
+      "price": 4.00,
+      "sizes": [
+        { "label": "Small",  "price_modifier": 0.00 },
+        { "label": "Medium", "price_modifier": 0.50 },
+        { "label": "Large",  "price_modifier": 1.00 }
+      ],
+      "allergens": ["milk"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": true },
+      "available": true
+    },
+    {
+      "id": "d003",
+      "category": "hot_drinks",
+      "name": "Cappuccino",
+      "description": "Equal parts espresso, steamed milk, and thick microfoam.",
+      "price": 3.75,
+      "sizes": [
+        { "label": "Small",  "price_modifier": 0.00 },
+        { "label": "Medium", "price_modifier": 0.50 },
+        { "label": "Large",  "price_modifier": 1.00 }
+      ],
+      "allergens": ["milk"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": true },
+      "available": true
+    },
+    {
+      "id": "d004",
+      "category": "hot_drinks",
+      "name": "Chai Latte",
+      "description": "Spiced black tea with steamed milk — warming, mildly sweet, and aromatic.",
+      "price": 4.25,
+      "sizes": [
+        { "label": "Small",  "price_modifier": 0.00 },
+        { "label": "Medium", "price_modifier": 0.50 },
+        { "label": "Large",  "price_modifier": 1.00 }
+      ],
+      "allergens": ["milk"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": true },
+      "available": true
+    },
+    {
+      "id": "d005",
+      "category": "cold_drinks",
+      "name": "Iced Latte",
+      "description": "Double espresso over ice, topped with cold milk.",
+      "price": 4.50,
+      "sizes": [
+        { "label": "Medium", "price_modifier": 0.00 },
+        { "label": "Large",  "price_modifier": 0.75 }
+      ],
+      "allergens": ["milk"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": true },
+      "available": true
+    },
+    {
+      "id": "d006",
+      "category": "cold_drinks",
+      "name": "Green Tea",
+      "description": "Delicate Japanese sencha brewed at the perfect temperature.",
+      "price": 2.75,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": [],
+      "dietary": { "vegan": true, "vegetarian": true, "gluten_free": true },
+      "available": true
+    },
+    {
+      "id": "d007",
+      "category": "cold_drinks",
+      "name": "Mango Smoothie",
+      "description": "Blended fresh mango, banana, and oat milk — naturally sweet and creamy.",
+      "price": 5.50,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 },
+        { "label": "Large",   "price_modifier": 1.00 }
+      ],
+      "allergens": ["oats"],
+      "dietary": { "vegan": true, "vegetarian": true, "gluten_free": false },
+      "available": true
+    },
+    {
+      "id": "f001",
+      "category": "pastries",
+      "name": "Butter Croissant",
+      "description": "Flaky, golden croissant made with French butter. Best enjoyed warm.",
+      "price": 3.00,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": ["gluten", "milk", "eggs"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": false },
+      "available": true
+    },
+    {
+      "id": "f002",
+      "category": "pastries",
+      "name": "Blueberry Muffin",
+      "description": "Soft, fluffy muffin bursting with fresh blueberries and a sugar-crumb top.",
+      "price": 2.50,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": ["gluten", "milk", "eggs"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": false },
+      "available": true
+    },
+    {
+      "id": "f003",
+      "category": "pastries",
+      "name": "Cinnamon Roll",
+      "description": "Pillowy roll swirled with cinnamon sugar and finished with cream-cheese glaze.",
+      "price": 3.75,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": ["gluten", "milk", "eggs"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": false },
+      "available": true
+    },
+    {
+      "id": "f004",
+      "category": "savoury",
+      "name": "Avocado Toast",
+      "description": "Sourdough toast topped with smashed avocado, chilli flakes, and lemon zest.",
+      "price": 6.50,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": ["gluten"],
+      "dietary": { "vegan": true, "vegetarian": true, "gluten_free": false },
+      "available": true
+    },
+    {
+      "id": "f005",
+      "category": "savoury",
+      "name": "Ham & Cheese Panini",
+      "description": "Toasted ciabatta with honey-roast ham, Gruyère, and whole-grain mustard.",
+      "price": 7.00,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": ["gluten", "milk"],
+      "dietary": { "vegan": false, "vegetarian": false, "gluten_free": false },
+      "available": true
+    },
+    {
+      "id": "f006",
+      "category": "savoury",
+      "name": "Veggie Wrap",
+      "description": "Spinach tortilla filled with roasted peppers, hummus, feta, and mixed leaves.",
+      "price": 6.00,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": ["gluten", "milk", "sesame"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": false },
+      "available": true
+    },
+    {
+      "id": "f007",
+      "category": "sweets",
+      "name": "Chocolate Brownie",
+      "description": "Dense, fudgy brownie made with 70% dark chocolate. Served at room temperature.",
+      "price": 2.75,
+      "sizes": [
+        { "label": "Regular", "price_modifier": 0.00 }
+      ],
+      "allergens": ["gluten", "milk", "eggs", "nuts"],
+      "dietary": { "vegan": false, "vegetarian": true, "gluten_free": false },
+      "available": true
+    }
+  ]
+}

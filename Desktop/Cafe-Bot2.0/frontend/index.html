@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CafeBot — Cozy Corner Cafe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0e8df;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+    }
+
+    /* ── Shell ── */
+    .chat-shell {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      background: #fff;
+      box-shadow: 0 0 48px rgba(61,31,26,.12);
+    }
+
+    /* ── Header ── */
+    .chat-header {
+      background: #3d1f1a;
+      color: #fff;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .header-avatar {
+      width: 42px; height: 42px;
+      background: #c8a07a;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .header-text h1   { font-size: 16px; font-weight: 700; line-height: 1.25; }
+    .header-text span { font-size: 12px; opacity: .65; }
+
+    .status-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      background: #6fcf6f;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    /* ── Messages ── */
+    .chat-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-body::-webkit-scrollbar { width: 4px; }
+    .chat-body::-webkit-scrollbar-thumb { background: #e8ddd5; border-radius: 2px; }
+
+    .date-chip {
+      align-self: center;
+      font-size: 11px;
+      color: #a89488;
+      background: #f5ede6;
+      border-radius: 12px;
+      padding: 3px 10px;
+      margin: 4px 0;
+    }
+
+    /* Row wrapper */
+    .msg-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 7px;
+      max-width: 82%;
+    }
+    .msg-row.bot  { align-self: flex-start; }
+    .msg-row.user { align-self: flex-end;   flex-direction: row-reverse; }
+
+    .row-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .msg-row.bot  .row-avatar { background: #f2e8df; }
+    .msg-row.user .row-avatar { background: #e5dbd4; }
+
+    .bubble-col { display: flex; flex-direction: column; gap: 3px; }
+    .msg-row.user .bubble-col { align-items: flex-end; }
+
+    .bubble {
+      padding: 9px 13px;
+      font-size: 14px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .msg-row.bot  .bubble {
+      background: #f5ede6;
+      color: #2d1810;
+      border-radius: 18px 18px 18px 4px;
+    }
+    .msg-row.user .bubble {
+      background: #3d1f1a;
+      color: #fff;
+      border-radius: 18px 18px 4px 18px;
+    }
+
+    .msg-time {
+      font-size: 10px;
+      color: #b5a49a;
+      padding: 0 4px;
+    }
+
+    /* Typing indicator */
+    .typing .bubble { padding: 11px 14px; }
+    .dots { display: flex; gap: 4px; align-items: center; height: 14px; }
+    .dots span {
+      width: 7px; height: 7px;
+      background: #b08060;
+      border-radius: 50%;
+      animation: dot-bounce 1.3s infinite ease-in-out;
+    }
+    .dots span:nth-child(2) { animation-delay: .18s; }
+    .dots span:nth-child(3) { animation-delay: .36s; }
+    @keyframes dot-bounce {
+      0%, 60%, 100% { transform: translateY(0);    opacity: .6; }
+      30%            { transform: translateY(-6px); opacity: 1;  }
+    }
+
+    /* ── Quick replies ── */
+    .quick-replies {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding: 6px 14px 2px;
+      flex-shrink: 0;
+    }
+
+    .qr-btn {
+      background: #fff;
+      border: 1.5px solid #c8a07a;
+      color: #3d1f1a;
+      border-radius: 20px;
+      padding: 6px 13px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background .14s, color .14s, border-color .14s;
+      white-space: nowrap;
+    }
+    .qr-btn:hover {
+      background: #3d1f1a;
+      color: #fff;
+      border-color: #3d1f1a;
+    }
+    .qr-btn:active { transform: scale(.95); }
+
+    /* ── Input bar ── */
+    .chat-footer {
+      border-top: 1px solid #f0e5de;
+      padding: 11px 14px 14px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      background: #fff;
+      flex-shrink: 0;
+    }
+
+    #msg-input {
+      flex: 1;
+      border: 1.5px solid #e5d8cf;
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-size: 16px;
+      outline: none;
+      background: #faf6f3;
+      color: #2d1810;
+      transition: border-color .15s;
+    }
+    #msg-input:focus            { border-color: #c8a07a; }
+    #msg-input:disabled         { opacity: .5; cursor: not-allowed; }
+    #msg-input::placeholder     { color: #b8aaa2; }
+
+    #send-btn {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: #3d1f1a;
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background .15s, transform .1s;
+    }
+    #send-btn:hover    { background: #5a2e28; }
+    #send-btn:active   { transform: scale(.91); }
+    #send-btn:disabled { opacity: .45; cursor: not-allowed; }
+    #send-btn svg      { width: 18px; height: 18px; fill: #fff; }
+
+    /* ── Responsive: narrow phones ── */
+    @media (max-width: 400px) {
+      .chat-header { padding: 12px 14px; }
+      .bubble      { font-size: 13px; }
+      .qr-btn      { font-size: 12px; padding: 5px 11px; }
+    }
+  </style>
+</head>
+<body>
+<div class="chat-shell">
+
+  <!-- Header -->
+  <header class="chat-header">
+    <div class="header-avatar">☕</div>
+    <div class="header-text">
+      <h1>Brew</h1>
+      <span><span class="status-dot"></span>Cozy Corner Cafe</span>
+    </div>
+  </header>
+
+  <!-- Messages -->
+  <div class="chat-body" id="chat-body" role="log" aria-live="polite" aria-label="Chat messages">
+    <div class="date-chip">Today</div>
+  </div>
+
+  <!-- Quick replies -->
+  <div class="quick-replies" id="quick-replies">
+    <button type="button" class="qr-btn" onclick="useSuggestion(this)">See the menu 📋</button>
+    <button type="button" class="qr-btn" onclick="useSuggestion(this)">Recommend something ✨</button>
+    <button type="button" class="qr-btn" onclick="useSuggestion(this)">Any deals today? 🏷️</button>
+  </div>
+
+  <!-- Input -->
+  <footer class="chat-footer">
+    <input
+      id="msg-input"
+      type="text"
+      placeholder="Message Brew…"
+      autocomplete="off"
+      aria-label="Type a message"
+    />
+    <button type="button" id="send-btn" onclick="handleSend()" aria-label="Send message">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+      </svg>
+    </button>
+  </footer>
+
+</div>
+
+<script>
+  const chatBody     = document.getElementById('chat-body');
+  const inputEl      = document.getElementById('msg-input');
+  const quickReplies = document.getElementById('quick-replies');
+
+  // ── Mock bot replies (rotate through on each send) ──────────────────────
+  let isBotTyping = false;
+
+  const mockReplies = [
+    "Sure thing! Would you like to add anything else to your order?",
+    "Great choice! So far I have that noted — shall I keep going or wrap up?",
+    "We have a Happy Hour deal — 20% off all drinks Mon–Fri between 3 pm and 5 pm!",
+    "Our Latte ($4.00) + Butter Croissant ($3.00) is a popular morning combo. Fancy that?",
+    "Here's your order summary:\n• Double Espresso — $3.25\n• Butter Croissant — $3.00\nSubtotal: $6.25. Shall I place this order?",
+    "Perfect! Your order is in. It'll be ready at the counter in a few minutes — enjoy! ☕",
+    "I'm only here to help with Cozy Corner Cafe — can I get you something from our menu?",
+  ];
+  let replyIdx = 0;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function nowTime() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function appendMessage(text, role) {
+    const row = document.createElement('div');
+    row.className = `msg-row ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'row-avatar';
+    avatar.textContent = role === 'bot' ? '☕' : '🧑';
+
+    const col = document.createElement('div');
+    col.className = 'bubble-col';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    // Support newlines in mock replies
+    bubble.style.whiteSpace = 'pre-line';
+    bubble.textContent = text;
+
+    const time = document.createElement('div');
+    time.className = 'msg-time';
+    time.textContent = nowTime();
+
+    col.appendChild(bubble);
+    col.appendChild(time);
+    row.appendChild(avatar);
+    row.appendChild(col);
+    chatBody.appendChild(row);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  function showTyping() {
+    const row = document.createElement('div');
+    row.className = 'msg-row bot typing';
+    row.id = 'typing-row';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'row-avatar';
+    avatar.textContent = '☕';
+
+    const col = document.createElement('div');
+    col.className = 'bubble-col';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+
+    col.appendChild(bubble);
+    row.appendChild(avatar);
+    row.appendChild(col);
+    chatBody.appendChild(row);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typing-row');
+    if (el) el.remove();
+  }
+
+  // ── Core send logic ───────────────────────────────────────────────────────
+  function setSendLock(locked) {
+    isBotTyping = locked;
+    inputEl.disabled = locked;
+    document.getElementById('send-btn').disabled = locked;
+  }
+
+  function sendUserMessage(text) {
+    const msg = text.trim();
+    if (!msg || isBotTyping) return;
+
+    appendMessage(msg, 'user');
+    inputEl.value = '';
+    quickReplies.style.display = 'none';
+    setSendLock(true);
+
+    showTyping();
+    const delay = 800 + Math.random() * 700;
+    setTimeout(() => {
+      removeTyping();
+      appendMessage(mockReplies[replyIdx % mockReplies.length], 'bot');
+      replyIdx++;
+      setSendLock(false);
+      inputEl.focus();
+    }, delay);
+  }
+
+  function handleSend() { sendUserMessage(inputEl.value); }
+
+  function useSuggestion(btn) { sendUserMessage(btn.textContent); }
+
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  });
+
+  // ── Opening greeting (slight delay for a natural feel) ───────────────────
+  setTimeout(() => {
+    appendMessage(
+      "Hey there, welcome to Cozy Corner Cafe! I'm Brew — what can I get for you today? ☕",
+      'bot'
+    );
+  }, 450);
+</script>
+</body>
+</html>

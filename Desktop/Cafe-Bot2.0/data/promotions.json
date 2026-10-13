@@ -1,0 +1,67 @@
+{
+  "promotions": [
+    {
+      "id": "promo_001",
+      "name": "Happy Hour",
+      "description": "20% off all drinks every weekday afternoon.",
+      "rule": "Apply automatically when the order is placed between 15:00 and 17:00 on a weekday. Discount applies to every drink in the order.",
+      "discount": {
+        "type": "percentage",
+        "value": 20,
+        "applies_to": "category",
+        "target_categories": ["hot_drinks", "cold_drinks"]
+      },
+      "eligibility": {
+        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "time_window": { "start": "15:00", "end": "17:00" },
+        "min_order_items": 1,
+        "required_item_ids": [],
+        "required_categories": []
+      },
+      "active": true
+    },
+    {
+      "id": "promo_002",
+      "name": "Morning Combo",
+      "description": "$1.50 off when you order any hot drink and any pastry before 11 am.",
+      "rule": "Apply when the order contains at least one item from 'hot_drinks' and at least one from 'pastries', and the order is placed before 11:00. Discount is a flat $1.50 off the order total.",
+      "discount": {
+        "type": "fixed",
+        "value": 1.50,
+        "applies_to": "order_total",
+        "target_categories": []
+      },
+      "eligibility": {
+        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        "time_window": { "start": "00:00", "end": "11:00" },
+        "min_order_items": 2,
+        "required_item_ids": [],
+        "required_categories": ["hot_drinks", "pastries"]
+      },
+      "active": true
+    },
+    {
+      "id": "promo_003",
+      "name": "Weekend Treat",
+      "description": "Get a free Chocolate Brownie with any large drink on weekends.",
+      "rule": "Apply when the order contains at least one large-size drink on a Saturday or Sunday. Add one Chocolate Brownie (f007) to the order at $0.00.",
+      "discount": {
+        "type": "free_item",
+        "value": 0,
+        "applies_to": "item",
+        "free_item_id": "f007",
+        "free_item_name": "Chocolate Brownie",
+        "target_categories": []
+      },
+      "eligibility": {
+        "days": ["Saturday", "Sunday"],
+        "time_window": { "start": "00:00", "end": "23:59" },
+        "min_order_items": 1,
+        "required_item_ids": [],
+        "required_categories": ["hot_drinks", "cold_drinks"],
+        "required_size": "Large"
+      },
+      "active": false
+    }
+  ]
+}

@@ -795,6 +795,8 @@ def chat():
             "order": order,
         })
     except Exception:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": "Something went wrong. Please try again."}), 500
 
 

@@ -269,21 +269,11 @@
   const inputEl      = document.getElementById('msg-input');
   const quickReplies = document.getElementById('quick-replies');
 
-  // ── Mock bot replies (rotate through on each send) ──────────────────────
   let isBotTyping = false;
+  let sessionId   = null;
+  let history     = [];   // [{role, content}] — sent to /api/chat each turn
 
-  const mockReplies = [
-    "Sure thing! Would you like to add anything else to your order?",
-    "Great choice! So far I have that noted — shall I keep going or wrap up?",
-    "We have a Happy Hour deal — 20% off all drinks Mon–Fri between 3 pm and 5 pm!",
-    "Our Latte ($4.00) + Butter Croissant ($3.00) is a popular morning combo. Fancy that?",
-    "Here's your order summary:\n• Double Espresso — $3.25\n• Butter Croissant — $3.00\nSubtotal: $6.25. Shall I place this order?",
-    "Perfect! Your order is in. It'll be ready at the counter in a few minutes — enjoy! ☕",
-    "I'm only here to help with Cozy Corner Cafe — can I get you something from our menu?",
-  ];
-  let replyIdx = 0;
-
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   function nowTime() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
@@ -301,7 +291,6 @@
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    // Support newlines in mock replies
     bubble.style.whiteSpace = 'pre-line';
     bubble.textContent = text;
 
@@ -345,14 +334,14 @@
     if (el) el.remove();
   }
 
-  // ── Core send logic ───────────────────────────────────────────────────────
   function setSendLock(locked) {
     isBotTyping = locked;
     inputEl.disabled = locked;
     document.getElementById('send-btn').disabled = locked;
   }
 
-  function sendUserMessage(text) {
+  // ── Core send logic — calls real /api/chat ────────────────────────────────
+  async function sendUserMessage(text) {
     const msg = text.trim();
     if (!msg || isBotTyping) return;
 
@@ -360,16 +349,34 @@
     inputEl.value = '';
     quickReplies.style.display = 'none';
     setSendLock(true);
-
     showTyping();
-    const delay = 800 + Math.random() * 700;
-    setTimeout(() => {
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, history, session_id: sessionId }),
+      });
+
+      const data = await res.json();
       removeTyping();
-      appendMessage(mockReplies[replyIdx % mockReplies.length], 'bot');
-      replyIdx++;
-      setSendLock(false);
-      inputEl.focus();
-    }, delay);
+
+      if (res.ok && data.reply) {
+        if (data.session_id) sessionId = data.session_id;
+        history.push({ role: 'user',      content: msg        });
+        history.push({ role: 'assistant', content: data.reply });
+        if (history.length > 24) history = history.slice(-24);
+        appendMessage(data.reply, 'bot');
+      } else {
+        appendMessage(data.error || 'Something went wrong. Please try again.', 'bot');
+      }
+    } catch {
+      removeTyping();
+      appendMessage('Could not reach the server. Please try again.', 'bot');
+    }
+
+    setSendLock(false);
+    inputEl.focus();
   }
 
   function handleSend() { sendUserMessage(inputEl.value); }
@@ -383,7 +390,7 @@
     }
   });
 
-  // ── Opening greeting (slight delay for a natural feel) ───────────────────
+  // ── Opening greeting ───────────────────────────────────────────────────────
   setTimeout(() => {
     appendMessage(
       "Hey there, welcome to Cozy Corner Cafe! I'm Brew — what can I get for you today? ☕",

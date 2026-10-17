@@ -3,6 +3,7 @@ import { useState, createContext, useContext, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import ProfileModal from './components/ProfileModal'
+import SettingsModal from './components/SettingsModal'
 import DashboardPage from './pages/DashboardPage'
 import JobsPage from './pages/JobsPage'
 import JobDetailPage from './pages/JobDetailPage'
@@ -30,6 +31,7 @@ function Layout({ children }) {
         <main className="page-content">{children}</main>
       </div>
       <ProfileModal />
+      <SettingsModal />
     </div>
   )
 }
@@ -41,6 +43,7 @@ function App() {
   const [cvProfile, setCvProfile]       = useState(null)
   const [userProfile, setUserProfile]   = useState(_loadProfile)
   const [profileOpen, setProfileOpen]   = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   function saveUserProfile(p) {
     setUserProfile(p)
@@ -78,6 +81,7 @@ function App() {
       cvUploaded, setCvUploaded, cvFile, setCvFile, cvProfile, setCvProfile,
       userProfile, saveUserProfile,
       profileOpen, setProfileOpen,
+      settingsOpen, setSettingsOpen,
     }}>
       <BrowserRouter>
         <Layout>

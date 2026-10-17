@@ -28,7 +28,7 @@ function CVUpload() {
       const result = await uploadCV(file)
       clearInterval(interval)
       setProgress(100)
-      setCvProfile(result.profile)
+      setCvProfile(result)
       setTimeout(() => { setAnalyzing(false); setCvUploaded(true) }, 400)
     } catch (err) {
       clearInterval(interval)

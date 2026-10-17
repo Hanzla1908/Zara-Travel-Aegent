@@ -1,3 +1,5 @@
+import logging
+import logging.config
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,6 +10,39 @@ from app.services.seeder import seed_jobs
 from app.models.database import SessionLocal
 from app.api import jobs, cv, saved, alerts, workflow
 from app.services import scheduler
+from app.middleware.rate_limit import RateLimitMiddleware
+
+# ---------------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------------
+
+logging.config.dictConfig({
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "default",
+            "stream": "ext://sys.stdout",
+        }
+    },
+    "root": {"level": "INFO", "handlers": ["console"]},
+    # Suppress noisy third-party loggers
+    "loggers": {
+        "httpx":          {"level": "WARNING", "propagate": True},
+        "httpcore":       {"level": "WARNING", "propagate": True},
+        "anthropic":      {"level": "WARNING", "propagate": True},
+        "uvicorn.access": {"level": "WARNING", "propagate": True},
+    },
+})
+
+_log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -16,10 +51,12 @@ async def lifespan(app: FastAPI):
     async with SessionLocal() as db:
         seeded = await seed_jobs(db)
         if seeded:
-            print(f"[startup] Seeded {seeded} jobs into the database.")
+            _log.info("Startup: seeded %d jobs into the database.", seeded)
     scheduler.start()
+    _log.info("Startup complete. Alert scheduler started.")
     yield
     scheduler.stop()
+    _log.info("Shutdown: alert scheduler stopped.")
 
 
 app = FastAPI(
@@ -29,6 +66,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rate limiting must be added before CORS so it fires first.
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],

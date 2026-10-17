@@ -238,16 +238,22 @@ async def _persist_notifications(
         if exists:
             continue
 
-        db.add(AlertNotification(
-            alert_id=alert.id,
-            user_id=alert.user_id,
-            job_external_id=ext_id,
-            job_id=job.get("id"),
-            job_title=job.get("title", ""),
-            company=job.get("company", ""),
-            score=round(score, 1),
-        ))
-        new_count += 1
+        try:
+            # Use a savepoint so a concurrent duplicate only rolls back this one row.
+            async with db.begin_nested():
+                db.add(AlertNotification(
+                    alert_id=alert.id,
+                    user_id=alert.user_id,
+                    job_external_id=ext_id,
+                    job_id=job.get("id"),
+                    job_title=job.get("title", ""),
+                    company=job.get("company", ""),
+                    score=round(score, 1),
+                ))
+            new_count += 1
+        except IntegrityError:
+            # A concurrent request beat us to this (alert, job) pair — silently skip.
+            pass
 
     return new_count
 

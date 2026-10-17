@@ -1,4 +1,7 @@
 import io
+import logging
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -11,7 +14,44 @@ from app.schemas.match import MatchListResponse, JobMatchResponse, ScoreBreakdow
 from app.services.cv_parser import parse_cv
 from app.services.matcher import MatchWeights, rank_jobs
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Magic bytes for allowed file types
+_MAGIC_PDF  = b"%PDF"
+_MAGIC_DOCX = b"PK\x03\x04"          # DOCX is a ZIP container
+_MAGIC_DOC  = b"\xd0\xcf\x11\xe0"    # OLE2 compound document (legacy .doc)
+
+_MAX_USER_ID_LEN = 100
+
+
+def _validate_user_id(user_id: str) -> str:
+    """Reject suspiciously long or empty user_id strings before they hit the DB."""
+    if not user_id or len(user_id) > _MAX_USER_ID_LEN:
+        raise HTTPException(status_code=422, detail="Invalid user_id.")
+    return user_id
+
+
+def _check_magic(data: bytes, content_type: str) -> None:
+    """Verify file magic bytes match the declared content-type to prevent spoofing."""
+    if data[:4] == _MAGIC_PDF:
+        return  # PDF — accept regardless of declared type
+    if data[:4] == _MAGIC_DOCX or data[:8].startswith(_MAGIC_DOCX):
+        return  # DOCX (ZIP)
+    if data[:4] == _MAGIC_DOC:
+        return  # legacy DOC (OLE2)
+    raise HTTPException(
+        status_code=415,
+        detail="File content does not match a valid PDF or DOCX document.",
+    )
+
+
+def _safe_filename(raw: str | None) -> str:
+    """Strip path components from an uploaded filename and fall back to 'resume'."""
+    if not raw:
+        return "resume"
+    name = Path(raw).name  # drops any directory prefix
+    return name or "resume"
 
 
 @router.post("/upload", response_model=CVProfileResponse, status_code=201)
@@ -20,6 +60,8 @@ async def upload_cv(
     user_id: str = Query(default="default"),
     db: AsyncSession = Depends(get_db),
 ):
+    _validate_user_id(user_id)
+
     allowed = {"application/pdf", "application/msword",
                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
     if file.content_type not in allowed:
@@ -29,14 +71,24 @@ async def upload_cv(
     if len(contents) > 10 * 1024 * 1024:  # 10 MB limit
         raise HTTPException(status_code=413, detail="File too large. Max size is 10 MB.")
 
+    _check_magic(contents, file.content_type or "")
+
+    safe_name = _safe_filename(file.filename)
+    logger.info("CV upload: user=%r file=%r size=%d bytes", user_id, safe_name, len(contents))
+
     parsed = await parse_cv(contents, file.content_type or "")
+    logger.info(
+        "CV parsed: user=%r skills=%d experience_years=%d strength=%d",
+        user_id, len(parsed.get("skills", [])),
+        parsed.get("experience_years", 0), parsed.get("profile_strength", 0),
+    )
 
     # Replace existing profile for this user
     await db.execute(delete(CVProfile).where(CVProfile.user_id == user_id))
 
     profile = CVProfile(
         user_id=user_id,
-        file_name=file.filename or "resume",
+        file_name=safe_name,
         file_size=len(contents),
         raw_text=parsed.get("raw_text", ""),
         skills=parsed.get("skills", []),
@@ -57,6 +109,7 @@ async def get_profile(
     user_id: str = Query(default="default"),
     db: AsyncSession = Depends(get_db),
 ):
+    _validate_user_id(user_id)
     result = await db.execute(
         select(CVProfile)
         .where(CVProfile.user_id == user_id)
@@ -162,8 +215,9 @@ async def delete_profile(
     user_id: str = Query(default="default"),
     db: AsyncSession = Depends(get_db),
 ):
+    _validate_user_id(user_id)
     result = await db.execute(
-        select(CVProfile).where(CVProfile.user_id == user_id)
+        select(CVProfile).where(CVProfile.user_id == user_id).limit(1)
     )
     profile = result.scalar_one_or_none()
     if not profile:

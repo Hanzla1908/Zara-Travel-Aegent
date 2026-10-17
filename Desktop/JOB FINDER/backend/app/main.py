@@ -7,6 +7,7 @@ from app.models.database import init_db
 from app.services.seeder import seed_jobs
 from app.models.database import SessionLocal
 from app.api import jobs, cv, saved, alerts, workflow
+from app.services import scheduler
 
 
 @asynccontextmanager
@@ -16,7 +17,9 @@ async def lifespan(app: FastAPI):
         seeded = await seed_jobs(db)
         if seeded:
             print(f"[startup] Seeded {seeded} jobs into the database.")
+    scheduler.start()
     yield
+    scheduler.stop()
 
 
 app = FastAPI(

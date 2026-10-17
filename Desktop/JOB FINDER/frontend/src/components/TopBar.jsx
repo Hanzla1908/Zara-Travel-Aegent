@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useApp } from '../App'
 
 const pageTitles = {
   '/':       'Dashboard',
@@ -15,9 +16,16 @@ function BellIcon() {
   )
 }
 
+function avatarInitials(name) {
+  const parts = (name || '').trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 function TopBar() {
   const location = useLocation()
   const navigate  = useNavigate()
+  const { userProfile, setProfileOpen } = useApp()
 
   const titleKey = Object.keys(pageTitles).find(k =>
     k === '/' ? location.pathname === '/' : location.pathname.startsWith(k)
@@ -29,6 +37,8 @@ function TopBar() {
       navigate(`/jobs?q=${encodeURIComponent(e.target.value.trim())}`)
     }
   }
+
+  const ini = avatarInitials(userProfile?.name || 'HA')
 
   return (
     <header className="topbar">
@@ -48,7 +58,14 @@ function TopBar() {
           <BellIcon />
           <span className="notif-dot" />
         </button>
-        <div className="topbar-avatar" title="Profile">HM</div>
+        <div
+          className="topbar-avatar"
+          title="Edit profile"
+          onClick={() => setProfileOpen(true)}
+          style={{ cursor: 'pointer' }}
+        >
+          {ini}
+        </div>
       </div>
     </header>
   )

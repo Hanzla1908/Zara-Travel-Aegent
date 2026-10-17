@@ -36,9 +36,18 @@ const navItems = [
   },
 ]
 
+function sidebarInitials(name) {
+  const parts = (name || '').trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 function Sidebar() {
-  const { savedIds } = useApp()
+  const { savedIds, userProfile, setProfileOpen } = useApp()
   const savedCount = savedIds.size
+  const name  = userProfile?.name  || 'Hanzla Arif'
+  const email = userProfile?.email || 'hanzla90@gmail.com'
+  const ini   = sidebarInitials(name)
 
   return (
     <aside className="sidebar">
@@ -85,11 +94,11 @@ function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="user-card">
-          <div className="user-avatar">HM</div>
+        <div className="user-card" onClick={() => setProfileOpen(true)} style={{ cursor: 'pointer' }} title="Edit profile">
+          <div className="user-avatar">{ini}</div>
           <div>
-            <div className="user-name">Hanzla Mian</div>
-            <div className="user-email">mian2275634@gmail.com</div>
+            <div className="user-name">{name}</div>
+            <div className="user-email">{email}</div>
           </div>
         </div>
       </div>

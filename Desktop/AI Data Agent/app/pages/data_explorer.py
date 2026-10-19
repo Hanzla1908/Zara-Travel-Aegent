@@ -25,7 +25,10 @@ from app.components.cards import (
     page_header, metric_row, section_title, empty_state, content_card,
 )
 from app.analytics.profiler import profile as compute_profile, _dtype_category
-from app.services.export_service import to_csv_bytes, to_excel_bytes
+from app.services.export_service import (
+    to_csv_bytes, to_excel_bytes, to_chart_png, get_filtered_view,
+)
+from app.services.report_builder import build_html_report, build_excel_report
 import app.analytics.chart_factory as cf
 
 
@@ -600,6 +603,46 @@ def _render_statistics(df: pd.DataFrame) -> None:
                 if fig_sc:
                     st.plotly_chart(fig_sc, use_container_width=True,
                                     config={"displayModeBar": False})
+                    _chart_download_row(fig_sc, f"scatter_{top_pair['A']}_{top_pair['B']}.png")
+
+        # Correlation heatmap download
+        if len(selected_corr) >= 3:
+            _chart_download_row(fig_heat, "correlation_heatmap.png")
+
+
+# ── Chart download helper ─────────────────────────────────────────────────────
+
+def _chart_download_row(fig, default_fname: str = "chart.png") -> None:
+    """Render a compact PNG + interactive-HTML download strip below a chart."""
+    if fig is None:
+        return
+
+    c1, c2, _ = st.columns([1, 1, 4])
+    with c1:
+        png = to_chart_png(fig)
+        if png:
+            st.download_button(
+                "⬇ PNG",
+                data=png,
+                file_name=default_fname,
+                mime="image/png",
+                key=f"dl_png_{default_fname}",
+                help="Download chart as PNG image",
+            )
+    with c2:
+        html_bytes = fig.to_html(
+            full_html=True,
+            include_plotlyjs=True,
+            config={"displayModeBar": True, "scrollZoom": True},
+        ).encode("utf-8")
+        st.download_button(
+            "⬇ Interactive HTML",
+            data=html_bytes,
+            file_name=default_fname.replace(".png", ".html"),
+            mime="text/html",
+            key=f"dl_html_{default_fname}",
+            help="Download as interactive HTML (open in browser)",
+        )
 
 
 # ── Clean tab ────────────────────────────────────────────────────────────────
@@ -1092,63 +1135,291 @@ def _clean_trim(df: pd.DataFrame, prof: dict) -> None:
 # ── Export tab ───────────────────────────────────────────────────────────────
 
 def _render_export(df: pd.DataFrame, lr) -> None:
-    section_title("Download Dataset")
+    """Three export sections: data downloads, analysis reports, chart images."""
+    fname    = lr.filename.rsplit(".", 1)[0]
+    orig_df  = st.session_state.get("_original_df", df)
+    history  = st.session_state.get("_clean_history", [])
+    is_clean = len(history) > 0
 
-    fname = lr.filename.rsplit(".", 1)[0]
+    # ── 1. Data downloads ──────────────────────────────────────────────────
+    section_title("Data Downloads")
 
-    c1, c2 = st.columns([2, 3])
-    with c1:
-        content_card("Export options", f"Source: {lr.filename}")
+    # Filtered view (matches what Preview tab is showing right now)
+    filtered_df = get_filtered_view(df)
+    is_filtered = (len(filtered_df) != len(df) or
+                   list(filtered_df.columns) != list(df.columns))
 
-        row_limit = st.selectbox(
-            "Rows to export",
-            ["All rows", "First 1,000", "First 10,000"],
-            key="exp_row_limit",
-        )
-        n_exp = None if row_limit == "All rows" else int(row_limit.split()[1].replace(",", ""))
-        export_df = df if n_exp is None else df.head(n_exp)
+    col_a, col_b, col_c = st.columns(3)
 
+    with col_a:
         st.markdown(
-            f'<div style="font-size:12px;color:#8a9aaa;padding:6px 0;">'
-            f'Will export {len(export_df):,} rows × {len(df.columns)} columns</div>',
+            _export_card_header(
+                "Current dataset",
+                f"{df.shape[0]:,} rows × {df.shape[1]} cols",
+                is_cleaned=is_clean,
+            ),
             unsafe_allow_html=True,
         )
-
         st.download_button(
-            "⬇️  Download CSV",
-            data=to_csv_bytes(export_df),
-            file_name=f"{fname}.csv",
+            "⬇ CSV",
+            data=to_csv_bytes(df),
+            file_name=f"{fname}_cleaned.csv" if is_clean else f"{fname}.csv",
             mime="text/csv",
             use_container_width=True,
+            key="exp_curr_csv",
         )
-        st.markdown('<div style="height:6px"></div>', unsafe_allow_html=True)
         st.download_button(
-            "⬇️  Download Excel (.xlsx)",
-            data=to_excel_bytes(export_df),
-            file_name=f"{fname}.xlsx",
+            "⬇ Excel (.xlsx)",
+            data=to_excel_bytes(df),
+            file_name=f"{fname}_cleaned.xlsx" if is_clean else f"{fname}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
+            key="exp_curr_xlsx",
         )
 
-    with c2:
-        content_card("File info", "Current dataset metadata")
-        for label, val in [
-            ("Filename",      lr.filename),
-            ("File type",     lr.file_type.upper()),
-            ("Active sheet",  lr.active_sheet or "—"),
-            ("Encoding",      lr.encoding),
-            ("Rows",          f"{df.shape[0]:,} (original: {lr.rows:,})"),
-            ("Columns",       str(df.shape[1])),
-            ("Memory (est.)", f"{round(df.memory_usage(deep=True).sum()/1024, 1)} KB"),
-        ]:
+    with col_b:
+        filter_label = (
+            f"{len(filtered_df):,} rows × {len(filtered_df.columns)} cols (filtered)"
+            if is_filtered else "Matches current dataset"
+        )
+        st.markdown(
+            _export_card_header("Filtered view", filter_label),
+            unsafe_allow_html=True,
+        )
+        st.download_button(
+            "⬇ CSV",
+            data=to_csv_bytes(filtered_df),
+            file_name=f"{fname}_filtered.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="exp_filt_csv",
+            disabled=not is_filtered,
+        )
+        st.download_button(
+            "⬇ Excel (.xlsx)",
+            data=to_excel_bytes(filtered_df),
+            file_name=f"{fname}_filtered.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="exp_filt_xlsx",
+            disabled=not is_filtered,
+        )
+        if not is_filtered:
+            st.caption("Apply a search/column filter in the Preview tab first.")
+
+    with col_c:
+        orig_label = (
+            f"{len(orig_df):,} rows × {len(orig_df.columns)} cols"
+            if is_clean else "No cleaning applied yet"
+        )
+        st.markdown(
+            _export_card_header("Original dataset", orig_label),
+            unsafe_allow_html=True,
+        )
+        st.download_button(
+            "⬇ CSV",
+            data=to_csv_bytes(orig_df),
+            file_name=f"{fname}_original.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="exp_orig_csv",
+            disabled=not is_clean,
+        )
+        st.download_button(
+            "⬇ Excel (.xlsx)",
+            data=to_excel_bytes(orig_df),
+            file_name=f"{fname}_original.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="exp_orig_xlsx",
+            disabled=not is_clean,
+        )
+        if not is_clean:
+            st.caption("Available after applying cleaning operations.")
+
+    # ── 2. Analysis reports ────────────────────────────────────────────────
+    section_title("Analysis Reports")
+
+    prof_key = f"_profile_{id(df)}"
+    prof     = st.session_state.get(prof_key)
+
+    if prof is None:
+        st.info("Navigate to any other tab first to compute the profile, then return here.")
+        return
+
+    rep_col1, rep_col2 = st.columns(2)
+
+    with rep_col1:
+        st.markdown(
+            _export_card_header(
+                "HTML Report",
+                "Self-contained · charts + tables · printable to PDF",
+            ),
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Includes dataset summary, KPIs, quality issues, "
+            "descriptive statistics, correlation analysis, key insights, "
+            "column profiles, and a data sample. "
+            "Open in any browser; use File → Print → Save as PDF."
+        )
+        with st.spinner("Building HTML report…"):
+            try:
+                html_bytes = build_html_report(df, orig_df, prof, lr, history)
+                st.download_button(
+                    "⬇ Download HTML Report",
+                    data=html_bytes,
+                    file_name=f"{fname}_analysis_report.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    key="exp_html_report",
+                )
+            except Exception as e:
+                st.error(f"HTML report error: {e}")
+
+    with rep_col2:
+        st.markdown(
+            _export_card_header(
+                "Excel Report",
+                "Multi-sheet · Summary · Quality · Statistics · Data · Charts",
+            ),
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Sheets: Summary (KPIs + insights), Data Quality, "
+            "Column Profiles, Statistics + Correlation, Data sample "
+            "(up to 10,000 rows)"
+            + (", Original Data, Cleaning History" if is_clean else "")
+            + ", Charts (PNG images)."
+        )
+        with st.spinner("Building Excel report…"):
+            try:
+                xl_bytes = build_excel_report(df, orig_df, prof, lr, history)
+                st.download_button(
+                    "⬇ Download Excel Report (.xlsx)",
+                    data=xl_bytes,
+                    file_name=f"{fname}_analysis_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="exp_xlsx_report",
+                )
+            except Exception as e:
+                st.error(f"Excel report error: {e}")
+
+    # ── 3. Chart image downloads ───────────────────────────────────────────
+    section_title("Chart Image Downloads")
+    st.caption("PNG images generated at print resolution (1.5×). Download and embed in slides or docs.")
+
+    num_cols = df.select_dtypes("number").columns.tolist()
+    charts: list[tuple[str, object, str]] = []  # (label, fig, filename)
+
+    # Correlation heatmap
+    if len(num_cols) >= 3:
+        fig_heat = cf.correlation_heatmap(df, num_cols[:12], height=420)
+        if fig_heat:
+            charts.append(("Correlation Heatmap", fig_heat, f"{fname}_correlation.png"))
+
+    # Null distribution
+    import plotly.express as _px
+    null_data = {c: prof.get("columns", {}).get(c, {}).get("null_pct", 0)
+                 for c in df.columns}
+    null_df = (
+        pd.DataFrame({"Column": list(null_data.keys()), "Missing %": list(null_data.values())})
+        .query("`Missing %` > 0")
+        .sort_values("Missing %", ascending=False)
+    )
+    if len(null_df) > 0:
+        fig_null = _px.bar(
+            null_df.head(30), x="Column", y="Missing %",
+            color="Missing %",
+            color_continuous_scale=["#dbeafe", "#ef4444"],
+            range_color=[0, 100],
+        )
+        fig_null.update_layout(
+            plot_bgcolor="white", paper_bgcolor="white",
+            font_family="Inter, sans-serif", font_color="#1a2332",
+            margin=dict(t=20, b=50, l=10, r=10),
+            xaxis=dict(tickangle=-35),
+            coloraxis_showscale=False, height=320,
+        )
+        charts.append(("Missing Values", fig_null, f"{fname}_missing_values.png"))
+
+    # Column histograms
+    for nc in num_cols[:4]:
+        fig_h = cf.histogram(df, nc, height=280)
+        if fig_h:
+            charts.append((f"Distribution: {nc}", fig_h, f"{fname}_dist_{nc}.png"))
+
+    # Categorical bar charts
+    cat_cols = [c for c in df.select_dtypes("object").columns if 2 <= df[c].nunique() <= 20]
+    for cc in cat_cols[:2]:
+        vc = df[cc].value_counts().head(12).reset_index()
+        vc.columns = [cc, "count"]
+        fig_b = cf.bar_ranked(vc, cc, "count", top_n=12, height=280)
+        if fig_b:
+            charts.append((f"Top {cc}", fig_b, f"{fname}_top_{cc}.png"))
+
+    if not charts:
+        st.info("No charts available. Load a dataset with numeric columns to enable chart downloads.")
+    else:
+        cols_per_row = 3
+        for i in range(0, len(charts), cols_per_row):
+            batch = charts[i : i + cols_per_row]
+            ch_cols = st.columns(cols_per_row)
+            for (label, fig, fname_chart), ch_col in zip(batch, ch_cols):
+                with ch_col:
+                    st.markdown(f"**{label}**")
+                    png = to_chart_png(fig)
+                    if png:
+                        st.image(png, use_container_width=True)
+                        st.download_button(
+                            f"⬇ PNG",
+                            data=png,
+                            file_name=fname_chart,
+                            mime="image/png",
+                            use_container_width=True,
+                            key=f"exp_chart_{fname_chart}",
+                        )
+                    else:
+                        st.caption("PNG export unavailable.")
+
+    # ── File info strip ────────────────────────────────────────────────────
+    section_title("File Info")
+    info_cols = st.columns(4)
+    meta_items = [
+        ("Filename",  lr.filename),
+        ("File type", lr.file_type.upper()),
+        ("Encoding",  lr.encoding),
+        ("Memory",    f"{round(df.memory_usage(deep=True).sum()/1024, 1)} KB"),
+        ("Rows (current)",  f"{df.shape[0]:,}"),
+        ("Rows (original)", f"{len(orig_df):,}"),
+        ("Columns",         str(df.shape[1])),
+        ("Active sheet",    lr.active_sheet or "—"),
+    ]
+    for idx, (label, val) in enumerate(meta_items):
+        with info_cols[idx % 4]:
             st.markdown(
-                f'<div style="display:flex;justify-content:space-between;padding:7px 0;'
-                f'border-bottom:1px solid #eef2f7;font-size:13px;">'
-                f'<span style="color:#8a9aaa;">{label}</span>'
-                f'<span style="color:#1a2332;font-weight:500;">{val}</span>'
+                f'<div style="padding:8px 0;border-bottom:1px solid #eef2f7;font-size:13px;">'
+                f'<div style="font-size:10px;color:#8a9aaa;text-transform:uppercase;'
+                f'letter-spacing:.06em;margin-bottom:2px;">{label}</div>'
+                f'<div style="font-weight:600;color:#1a2332;">{val}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
+
+
+def _export_card_header(title: str, subtitle: str, is_cleaned: bool = False) -> str:
+    badge = (
+        '<span style="background:#d1fae5;color:#065f46;font-size:10px;font-weight:700;'
+        'padding:2px 6px;border-radius:99px;margin-left:6px;">cleaned</span>'
+        if is_cleaned else ""
+    )
+    return (
+        f'<div style="margin-bottom:8px;">'
+        f'<div style="font-size:13px;font-weight:700;color:#1a2332;">{title}{badge}</div>'
+        f'<div style="font-size:11px;color:#64748b;margin-top:2px;">{subtitle}</div>'
+        f'</div>'
+    )
 
 
 # ── Session helpers ──────────────────────────────────────────────────────────

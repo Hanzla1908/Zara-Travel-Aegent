@@ -7,6 +7,13 @@ Produces a three-level profile:
   profile["quality"]   – aggregated quality checks with severity + a 0-100 score
 
 The profiler is read-only: it never modifies the DataFrame it receives.
+
+Performance
+-----------
+For DataFrames with more than SAMPLE_THRESHOLD rows the profiler uses a
+random sample for per-column statistics (value counts, string lengths, issue
+detection) while computing null/duplicate counts on the full dataset.  Shape
+metrics (rows, columns, missing cells, duplicate rows) are always exact.
 """
 
 from __future__ import annotations
@@ -17,12 +24,22 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+SAMPLE_THRESHOLD = 50_000   # rows above which per-column stats use a sample
+SAMPLE_SIZE      = 50_000   # sample size used when threshold is exceeded
+
 
 # ── Public entry point ───────────────────────────────────────────────────────
 
 def profile(df: pd.DataFrame) -> dict[str, Any]:
     """Return the full profile dict for *df*.  *df* is never mutated."""
-    col_profiles = {col: _profile_column(df[col]) for col in df.columns}
+    # For large DataFrames, sample once and reuse for all per-column stats.
+    # Null counts and duplicate detection always run on the full frame.
+    if len(df) > SAMPLE_THRESHOLD:
+        sample_df = df.sample(n=SAMPLE_SIZE, random_state=42)
+    else:
+        sample_df = df
+
+    col_profiles = {col: _profile_column(df[col], sample_df[col]) for col in df.columns}
     quality      = _quality_checks(df, col_profiles)
     summary      = _summary(df, col_profiles)
     return {"summary": summary, "columns": col_profiles, "quality": quality}
@@ -62,18 +79,29 @@ def _summary(df: pd.DataFrame, col_profiles: dict) -> dict[str, Any]:
 
 # ── Per-column ───────────────────────────────────────────────────────────────
 
-def _profile_column(series: pd.Series) -> dict[str, Any]:
+def _profile_column(series: pd.Series, sample: pd.Series | None = None) -> dict[str, Any]:
+    """Profile a single column.
+
+    *series* is the full column (used for exact null/unique counts).
+    *sample* is an optional sampled series for expensive stat operations;
+    when None, *series* is used for everything.
+    """
+    if sample is None:
+        sample = series
+
     n          = len(series)
     null_count = int(series.isna().sum())
     null_pct   = round(null_count / n * 100, 2) if n else 0.0
     non_null   = series.dropna()
+    non_null_s = sample.dropna()
 
+    # unique_count is computed on the full column so it stays exact
     unique_count = int(non_null.nunique())
     unique_pct   = round(unique_count / len(non_null) * 100, 2) if len(non_null) else 0.0
 
-    category = _dtype_category(series)
-    sample   = _sample_values(non_null)
-    issues   = _column_issues(series, non_null, category, null_pct, unique_pct)
+    category    = _dtype_category(series)
+    sample_vals = _sample_values(non_null)
+    issues      = _column_issues(series, non_null_s, category, null_pct, unique_pct)
 
     base: dict[str, Any] = {
         "dtype":          str(series.dtype),
@@ -82,18 +110,18 @@ def _profile_column(series: pd.Series) -> dict[str, Any]:
         "null_pct":       null_pct,
         "unique_count":   unique_count,
         "unique_pct":     unique_pct,
-        "sample_values":  sample,
+        "sample_values":  sample_vals,
         "issues":         issues,
     }
 
     if category == "numeric":
-        base.update(_numeric_stats(non_null))
+        base.update(_numeric_stats(non_null_s))
     elif category == "categorical":
-        base.update(_categorical_stats(non_null))
+        base.update(_categorical_stats(non_null_s))
     elif category == "datetime":
-        base.update(_datetime_stats(non_null))
+        base.update(_datetime_stats(non_null_s))
     elif category == "boolean":
-        base.update(_boolean_stats(non_null))
+        base.update(_boolean_stats(non_null_s))
 
     return base
 

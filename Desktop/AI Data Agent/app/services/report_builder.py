@@ -9,6 +9,7 @@ Public API
 
 from __future__ import annotations
 
+import html
 import io
 import base64
 from datetime import datetime
@@ -149,9 +150,13 @@ def _insights(
 # ── HTML helpers ─────────────────────────────────────────────────────────────
 
 def _df_to_html(df: pd.DataFrame, max_rows: int = 50, na_rep: str = "—") -> str:
-    """Render a DataFrame as a styled HTML table (no classes needed — inline styles)."""
+    """Render a DataFrame as a styled HTML table (no classes needed — inline styles).
+
+    All cell values are HTML-escaped so a dataset containing '<script>' tags
+    cannot execute code when the report is opened in a browser.
+    """
     cols   = df.columns.tolist()
-    header = "".join(f"<th>{c}</th>" for c in cols)
+    header = "".join(f"<th>{html.escape(str(c))}</th>" for c in cols)
 
     rows_html = ""
     for i, (_, row) in enumerate(df.head(max_rows).iterrows()):
@@ -159,7 +164,8 @@ def _df_to_html(df: pd.DataFrame, max_rows: int = 50, na_rep: str = "—") -> st
         cells = ""
         for c in cols:
             v = row[c]
-            cells += f"<td>{na_rep if pd.isna(v) else v}</td>"
+            display = na_rep if pd.isna(v) else html.escape(str(v))
+            cells += f"<td>{display}</td>"
         rows_html += f"<tr{bg}>{cells}</tr>"
 
     return (
@@ -339,13 +345,14 @@ def build_html_report(
         sev = "be" if "all_null" in cp["issues"] else (
               "bw" if any(i in cp["issues"] for i in ("high_null_severe", "constant")) else
               "bi" if cp["issues"] else "bg")
-        issues_str = ", ".join(cp["issues"][:3]) if cp["issues"] else "—"
-        sample = ", ".join(str(v) for v in cp.get("sample_values", [])[:3])[:60]
+        issues_str = html.escape(", ".join(cp["issues"][:3])) if cp["issues"] else "—"
+        sample_raw = ", ".join(str(v) for v in cp.get("sample_values", [])[:3])[:60]
+        sample = html.escape(sample_raw)
         profile_rows.append(
             f"<tr>"
-            f"<td style='font-weight:600'>{col}</td>"
+            f"<td style='font-weight:600'>{html.escape(col)}</td>"
             f"<td>{cp['dtype_category']}</td>"
-            f"<td>{cp['dtype']}</td>"
+            f"<td>{html.escape(cp['dtype'])}</td>"
             f"<td>{cp['null_count']:,} ({cp['null_pct']:.1f}%)</td>"
             f"<td>{cp['unique_count']:,} ({cp['unique_pct']:.1f}%)</td>"
             f"<td><span class='badge {sev}'>{issues_str}</span></td>"

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from app.analytics.column_intelligence import ColumnIntel
+from app.components.icons import icon as svg_icon
 
 
 # ── Output dataclass ─────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ class KPICard:
     value: str           # formatted value (e.g. "1,234,567" or "3.45%")
     delta: str           # formatted delta (e.g. "+12.3%") — empty if n/a
     delta_positive: bool # True when increase is good
-    icon: str            # emoji
+    icon: str            # inline SVG HTML
     sublabel: str        # "Total" / "Mean" / "Count" / "Unique" / "Range"
 
 
@@ -55,7 +56,7 @@ def compute_kpis(
             value=f"{len(df):,}",
             delta=f"of {len(full_df):,} ({pct:.0f}%)",
             delta_positive=True,
-            icon="🔢",
+            icon=svg_icon("list", 20, "#2563eb"),
             sublabel="Count",
         ))
     else:
@@ -64,7 +65,7 @@ def compute_kpis(
             value=f"{len(df):,}",
             delta="",
             delta_positive=True,
-            icon="🔢",
+            icon=svg_icon("list", 20, "#2563eb"),
             sublabel="Count",
         ))
 
@@ -99,7 +100,7 @@ def compute_kpis(
                 value=f"{n_unique:,}",
                 delta="",
                 delta_positive=True,
-                icon="🏷️",
+                icon=svg_icon("layers", 20, "#7c3aed"),
                 sublabel="Unique values",
             ))
 
@@ -203,7 +204,7 @@ def _date_range_card(col: str, df: pd.DataFrame) -> KPICard | None:
         value=f"{days:,} days",
         delta=f"{start} → {end}",
         delta_positive=True,
-        icon="📅",
+        icon=svg_icon("calendar-range", 20, "#f59e0b"),
         sublabel="Date range",
     )
 
@@ -268,17 +269,17 @@ def _display_name(col: str) -> str:
 def _icon_for_col(col: str) -> str:
     col_l = col.lower()
     if any(k in col_l for k in ("revenue", "sales", "income", "profit")):
-        return "💰"
+        return svg_icon("trending-up", 20, "#10b981")
     if any(k in col_l for k in ("cost", "expense", "spend", "loss")):
-        return "📉"
+        return svg_icon("trending-down", 20, "#ef4444")
     if any(k in col_l for k in ("user", "customer", "visit", "session", "view")):
-        return "👥"
+        return svg_icon("users", 20, "#2563eb")
     if any(k in col_l for k in ("order", "transaction", "conversion")):
-        return "🛒"
+        return svg_icon("shopping-cart", 20, "#f59e0b")
     if any(k in col_l for k in ("score", "rating", "nps", "csat")):
-        return "⭐"
+        return svg_icon("star", 20, "#f59e0b")
     if any(k in col_l for k in ("rate", "ratio", "pct", "percent")):
-        return "📊"
+        return svg_icon("percent", 20, "#7c3aed")
     if any(k in col_l for k in ("qty", "quantity", "unit", "count")):
-        return "📦"
-    return "📈"
+        return svg_icon("package", 20, "#64748b")
+    return svg_icon("bar-chart-2", 20, "#2563eb")

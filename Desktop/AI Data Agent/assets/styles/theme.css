@@ -199,8 +199,11 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"]:hover {
 .mc-delta.negative { color: var(--danger); }
 .mc-delta.neutral  { color: var(--text-muted); }
 .metric-card .mc-icon {
-  font-size: 22px;
-  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  opacity: 0.9;
+  line-height: 1;
 }
 
 /* ─── Content Cards ──────────────────────────────────────────────────────────── */
@@ -253,7 +256,14 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"]:hover {
   border: 1.5px dashed var(--border);
   color: var(--text-muted);
 }
-.empty-state .es-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
+.empty-state .es-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .empty-state .es-title {
   font-size: 16px;
   font-weight: 600;

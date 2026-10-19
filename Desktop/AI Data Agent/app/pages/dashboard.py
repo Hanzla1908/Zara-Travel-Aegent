@@ -29,6 +29,7 @@ from app.services.filter_service import (
     build_options, apply_filters, active_count, all_filter_keys,
 )
 import app.analytics.chart_factory as cf
+from app.components.icons import icon as svg_icon
 from app.components.cards import page_header, section_title, empty_state
 
 
@@ -43,7 +44,7 @@ def render() -> None:
     df: pd.DataFrame | None = st.session_state.get("df")
     if df is None or df.empty:
         empty_state(
-            "📊",
+            svg_icon("bar-chart-2", 48, "#cbd5e1"),
             "No dataset loaded",
             "Upload a CSV or Excel file in the sidebar to generate an automatic dashboard.",
         )
@@ -104,21 +105,21 @@ def _render_intel_banner(
 ) -> None:
     parts: list[str] = []
     if intel.date_cols:
-        parts.append(f"📅 **{len(intel.date_cols)}** date col{'s' if len(intel.date_cols)>1 else ''}")
+        parts.append(svg_icon("calendar", 13, "#64748b") + f' <strong>{len(intel.date_cols)}</strong> date col{"s" if len(intel.date_cols)>1 else ""}')
     total_num = len(intel.kpi_cols) + len(intel.mean_cols) + len(intel.dist_cols)
     if total_num:
-        parts.append(f"📈 **{total_num}** numeric col{'s' if total_num>1 else ''}")
+        parts.append(svg_icon("bar-chart-2", 13, "#64748b") + f' <strong>{total_num}</strong> numeric col{"s" if total_num>1 else ""}')
     if intel.cat_cols:
-        parts.append(f"🏷️ **{len(intel.cat_cols)}** categorical col{'s' if len(intel.cat_cols)>1 else ''}")
+        parts.append(svg_icon("tag", 13, "#64748b") + f' <strong>{len(intel.cat_cols)}</strong> categorical col{"s" if len(intel.cat_cols)>1 else ""}')
     if intel.id_cols:
-        parts.append(f"🔑 **{len(intel.id_cols)}** ID col{'s' if len(intel.id_cols)>1 else ''} skipped")
+        parts.append(svg_icon("key", 13, "#64748b") + f' <strong>{len(intel.id_cols)}</strong> ID col{"s" if len(intel.id_cols)>1 else ""} skipped')
 
     if is_filtered:
         pct = len(filtered_df) / len(df) * 100
         filter_badge = (
             f'<span style="background:#2563eb;color:#fff;border-radius:6px;'
             f'padding:2px 8px;font-size:11px;font-weight:700;margin-left:4px;">'
-            f'🔍 {len(filtered_df):,} / {len(df):,} rows ({pct:.0f}%)</span>'
+            f'{len(filtered_df):,} / {len(df):,} rows ({pct:.0f}%)</span>'
         )
     else:
         filter_badge = (
@@ -140,7 +141,7 @@ def _render_intel_banner(
 
     if intel.datetime_as_string:
         st.info(
-            f"💡 **{', '.join(intel.datetime_as_string[:3])}** look like dates stored as text. "
+            f"**{', '.join(intel.datetime_as_string[:3])}** look like dates stored as text. "
             "Convert them in Data Explorer for richer time-series charts."
         )
 
@@ -357,7 +358,7 @@ def _render_summary_table(df: pd.DataFrame, intel: ColumnIntel) -> None:
     if not num_cols:
         return
 
-    with st.expander("📋 Descriptive statistics", expanded=False):
+    with st.expander("Descriptive statistics", expanded=False):
         stats = cf.summary_stats(df, num_cols)
         if stats is not None:
             st.dataframe(stats, use_container_width=True)

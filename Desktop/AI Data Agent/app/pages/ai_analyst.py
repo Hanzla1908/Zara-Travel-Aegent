@@ -17,6 +17,7 @@ import os
 
 import streamlit as st
 
+from app.components.icons import icon as svg_icon
 from app.components.cards import page_header, empty_state
 from app.services.claude_service import (
     WARN_AT, BLOCK_AT, INSIGHT_TOKENS, DEFAULT_TOKENS,
@@ -106,7 +107,7 @@ def render() -> None:
     # ── No data ──────────────────────────────────────────────────────────
     if df is None or df.empty:
         empty_state(
-            "🤖",
+            svg_icon("bot", 48, "#cbd5e1"),
             "No dataset loaded",
             "Upload a CSV or Excel file in the sidebar, then return here for AI insights.",
         )

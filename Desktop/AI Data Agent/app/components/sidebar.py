@@ -1,4 +1,5 @@
-import streamlit as st
+﻿import streamlit as st
+from app.components.icons import icon as svg_icon
 
 NAV_ITEMS = [
     ("📊", "Overview"),
@@ -163,7 +164,7 @@ def _render_filters(df) -> None:
     # ── Date range ───────────────────────────────────────────────────
     if opts["date"]:
         info = opts["date"]
-        _filter_label("📅", info["col"])
+        _filter_label(svg_icon("calendar", 14, "#8099ae"), info["col"])
         st.date_input(
             info["col"],
             value=(info["min"], info["max"]),
@@ -178,7 +179,7 @@ def _render_filters(df) -> None:
     for info in opts["categoricals"]:
         col  = info["col"]
         vals = info["values"]
-        _filter_label("🏷️", col, count=len(vals))
+        _filter_label(svg_icon("tag", 14, "#8099ae"), col, count=len(vals))
         st.multiselect(
             col,
             options=vals,
@@ -195,7 +196,7 @@ def _render_filters(df) -> None:
         lo   = info["min"]
         hi   = info["max"]
         step = info["step"]
-        _filter_label("📊", col)
+        _filter_label(svg_icon("sliders-horizontal", 14, "#8099ae"), col)
         k = key_num(col)
         # Default to full range when not yet set or after reset
         default = st.session_state.get(k, (lo, hi))

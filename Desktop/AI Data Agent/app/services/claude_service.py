@@ -95,6 +95,7 @@ def ask(
     model: str | None = None,
     max_tokens: int = DEFAULT_TOKENS,
     history: list[dict] | None = None,
+    bump: bool = True,
 ) -> str:
     """Non-streaming single request.  Returns the full reply text.
 
@@ -102,6 +103,7 @@ def ask(
     ----------
     history: Optional prior turns as [{role, content}, ...] excluding the
              latest user message (which is `prompt`).
+    bump:    If False, the usage counter is NOT incremented (e.g. planning calls).
     """
     _check_limit()
     client = _get_client()
@@ -119,7 +121,8 @@ def ask(
             system=system,
             messages=messages,
         )
-        bump_usage()
+        if bump:
+            bump_usage()
         elapsed = time.monotonic() - t0
         logger.debug("Claude ask | ok | %.1fs | usage=%d", elapsed, get_usage())
         return msg.content[0].text

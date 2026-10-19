@@ -2,19 +2,21 @@
 
 Two tabs:
   Auto Insights — one-click structured report generated from validated stats
-  Chat          — multi-turn Q&A backed by the same stats context
+  Chat          — plan → execute → explain flow (never runs LLM-generated code)
 
-Claude never receives raw rows.  All prompts are built from aggregated
-statistics via insight_builder.  Facts and hypotheses are separated in both
-the system prompt and the rendered output.
+Claude returns a JSON query plan; Python validates every field against an
+allowlist and executes it with Pandas.  Claude then explains the verified
+result.  No arbitrary LLM-generated code or SQL is ever executed.
 
 Usage limits: warn at 20 calls/session, block at 30.
+Planning calls (step 1) do not count toward the limit.
 """
 
 from __future__ import annotations
 
 import os
 
+import pandas as pd
 import streamlit as st
 
 from app.components.icons import icon as svg_icon
@@ -22,7 +24,7 @@ from app.components.cards import page_header, empty_state
 from app.services.claude_service import (
     WARN_AT, BLOCK_AT, INSIGHT_TOKENS, DEFAULT_TOKENS,
     ConfigError, UsageLimitError,
-    stream_response, get_usage,
+    ask, stream_response, get_usage,
 )
 
 # ── System prompts ────────────────────────────────────────────────────────────
@@ -60,31 +62,9 @@ OUTPUT FORMAT (use exactly these headings):
 [Specific next steps for the analyst]
 """
 
-_CHAT_SYSTEM_TEMPLATE = """\
-You are a senior data analyst assistant. A statistical summary of the dataset
-is included below. The user will ask questions about their data.
+# ── Analyst chat system prompts are in query_planner — imported on demand ─────
 
-RULES:
-- Only reference statistics present in the DATA SUMMARY. Never invent numbers.
-- When giving an interpretation, mark it as your hypothesis, not a fact.
-- Be concise and direct. Use markdown tables and code blocks where helpful.
-- If a question cannot be answered from the summary, say so clearly and
-  suggest what additional analysis would help.
-
-DATA SUMMARY
-============
-{context}
-"""
-
-# ── Starter questions ─────────────────────────────────────────────────────────
-
-_STARTERS = [
-    "What are the most important patterns in this data?",
-    "Which categories are over- or under-performing?",
-    "Are there any data quality issues I should fix first?",
-    "What correlations should I investigate further?",
-    "What's driving the variation in the primary metric?",
-]
+_ANALYST_EXPLAIN_TOKENS = 600   # per-message explanation
 
 
 # ── Page entry point ──────────────────────────────────────────────────────────
@@ -242,95 +222,214 @@ def _render_insight_result(text: str) -> None:
     st.markdown(text)
 
 
-# ── Chat tab ──────────────────────────────────────────────────────────────────
+# ── Chat tab (plan → execute → explain) ───────────────────────────────────────
 
-def _render_chat_tab(df, has_key: bool) -> None:
+def _render_chat_tab(df: pd.DataFrame, has_key: bool) -> None:
+    from app.analytics.query_planner import (
+        build_schema_summary, build_suggestion_questions,
+    )
     intel = _get_intel(df)
 
-    # Build data context and bake it into the system prompt (cached per df)
-    ctx_key = f"_chat_context_{id(df)}"
-    if ctx_key not in st.session_state:
-        from app.analytics.insight_builder import build_context
-        st.session_state[ctx_key] = build_context(df, intel)
-    context: str = st.session_state[ctx_key]
-    chat_system = _CHAT_SYSTEM_TEMPLATE.format(context=context)
+    schema_key = f"_analyst_schema_{id(df)}"
+    if schema_key not in st.session_state:
+        st.session_state[schema_key] = build_schema_summary(df, intel)
+    schema_summary: str = st.session_state[schema_key]
 
-    if "_chat_history" not in st.session_state:
-        st.session_state["_chat_history"] = []
-    history: list[dict] = st.session_state["_chat_history"]
+    if "_analyst_history" not in st.session_state:
+        st.session_state["_analyst_history"] = []
+    history: list[dict] = st.session_state["_analyst_history"]
 
-    # Suggestion chips (shown when chat is empty)
+    # Suggestion chips (only when chat is empty)
     if not history:
         st.markdown(
-            '<div style="color:#64748b;font-size:12px;margin-bottom:8px;">Try a question:</div>',
+            '<div style="color:#64748b;font-size:12px;margin-bottom:8px;">'
+            "Try a question — results are computed in Python, then explained by Claude:</div>",
             unsafe_allow_html=True,
         )
-        cols = st.columns(len(_STARTERS))
-        for i, (col, q) in enumerate(zip(cols, _STARTERS)):
+        starters = build_suggestion_questions(df, intel)
+        cols = st.columns(len(starters))
+        for i, (col, q) in enumerate(zip(cols, starters)):
             with col:
                 if st.button(
-                    q, key=f"starter_{i}",
+                    q, key=f"analyst_starter_{i}",
                     use_container_width=True,
                     disabled=not has_key or get_usage() >= BLOCK_AT,
                 ):
-                    _chat_send(q, chat_system, history)
+                    _analyst_ask(q, df, intel, schema_summary, history)
                     st.rerun()
 
-    # Message history
+    # Render stored history
     for msg in history:
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            if msg["role"] == "assistant":
+                _render_analyst_message(msg)
+            else:
+                st.markdown(msg["content"])
 
-    # Input
-    prompt = st.chat_input(
+    # Chat input
+    question = st.chat_input(
         "Ask anything about your data…" if has_key else "Set ANTHROPIC_API_KEY to enable chat",
         disabled=not has_key or get_usage() >= BLOCK_AT,
     )
-    if prompt:
-        _chat_send(prompt, chat_system, history)
+    if question:
+        _analyst_ask(question, df, intel, schema_summary, history)
         st.rerun()
 
-    # Clear button
     if history:
-        if st.button("🗑️ Clear conversation", key="clear_chat"):
-            st.session_state["_chat_history"] = []
+        if st.button("Clear conversation", key="clear_analyst_chat"):
+            st.session_state["_analyst_history"] = []
             st.rerun()
 
 
-def _chat_send(prompt: str, chat_system: str, history: list[dict]) -> None:
-    """Add user message, stream assistant reply, append to history."""
-    history.append({"role": "user", "content": prompt})
+def _render_analyst_message(msg: dict) -> None:
+    """Re-render a stored assistant message from history."""
+    if msg.get("plan_error"):
+        st.warning(f"Could not build a query plan: {msg['plan_error']}", icon="⚠️")
 
-    # Build prior-turn history for the API (all turns except the latest user msg)
-    api_history: list[dict] = history[:-1]
+    if msg.get("error"):
+        st.error(msg["error"])
+
+    result_df: pd.DataFrame | None = msg.get("result_df")
+    result_chart = msg.get("result_chart")
+
+    if result_chart is not None:
+        st.plotly_chart(result_chart, use_container_width=True, config={"displayModeBar": False})
+
+    if result_df is not None and not result_df.empty:
+        with st.expander(f"Data table ({len(result_df)} rows)", expanded=False):
+            st.dataframe(result_df, use_container_width=True)
+
+    if msg.get("content"):
+        st.markdown(msg["content"])
+
+
+def _analyst_ask(
+    question: str,
+    df: pd.DataFrame,
+    intel,
+    schema_summary: str,
+    history: list[dict],
+) -> None:
+    """Plan → validate → execute → explain.  Appends to history."""
+    from app.analytics.query_planner import (
+        PLANNER_SYSTEM, EXPLAINER_SYSTEM, FALLBACK_EXPLAINER_SYSTEM,
+        parse_and_validate,
+    )
+    from app.analytics.query_executor import execute
+
+    history.append({"role": "user", "content": question})
+
+    result_df = None
+    result_chart = None
+    plan_error = ""
+    exec_error = ""
+    explanation = ""
+
+    # Show user message immediately
+    with st.chat_message("user"):
+        st.markdown(question)
 
     with st.chat_message("assistant"):
-        area = st.empty()
-        parts: list[str] = []
+        status_area = st.empty()
+        content_area = st.empty()
+
         try:
-            for chunk in stream_response(
-                prompt,
-                system=chat_system,        # data context is always in system prompt
-                max_tokens=DEFAULT_TOKENS,
-                history=api_history,
-            ):
-                parts.append(chunk)
-                area.markdown("".join(parts) + " ▮")
-            reply = "".join(parts)
-            area.markdown(reply)
-            history.append({"role": "assistant", "content": reply})
+            # ── Step 1: Plan (free call — doesn't count toward usage limit) ──
+            status_area.markdown("*Analysing your question…*")
+            planner_prompt = (
+                f"USER QUESTION: {question}\n\n"
+                f"DATASET SCHEMA:\n{schema_summary}"
+            )
+            raw_plan = ask(
+                planner_prompt,
+                system=PLANNER_SYSTEM,
+                max_tokens=600,
+                bump=False,   # planning calls are free
+            )
+
+            # ── Step 2: Validate ─────────────────────────────────────────────
+            plan_or_error = parse_and_validate(raw_plan, df, intel)
+
+            if isinstance(plan_or_error, str):
+                plan_error = plan_or_error
+                status_area.empty()
+                # Fallback: direct Claude answer from schema
+                fallback_prompt = (
+                    f"QUESTION: {question}\n\n"
+                    f"DATASET SCHEMA:\n{schema_summary}"
+                )
+                parts: list[str] = []
+                for chunk in stream_response(
+                    fallback_prompt,
+                    system=FALLBACK_EXPLAINER_SYSTEM,
+                    max_tokens=_ANALYST_EXPLAIN_TOKENS,
+                ):
+                    parts.append(chunk)
+                    content_area.markdown("".join(parts) + " ▮")
+                explanation = "".join(parts)
+                content_area.markdown(explanation)
+
+            else:
+                plan = plan_or_error
+                status_area.markdown(f"*Running `{plan.operation}` — {plan.intent}…*")
+
+                # ── Step 3: Execute (pure Python, no LLM code) ───────────────
+                result = execute(plan, df)
+
+                if result.error:
+                    exec_error = result.error
+                    status_area.empty()
+                    content_area.error(f"Execution error: {result.error}")
+                else:
+                    result_df = result.df
+                    result_chart = result.chart
+
+                    if result_chart is not None:
+                        st.plotly_chart(result_chart, use_container_width=True,
+                                        config={"displayModeBar": False})
+
+                    if result_df is not None and not result_df.empty:
+                        with st.expander(f"Data table ({len(result_df)} rows)", expanded=False):
+                            st.dataframe(result_df, use_container_width=True)
+
+                    # ── Step 4: Explain (streaming, counts toward limit) ──────
+                    status_area.empty()
+                    explain_prompt = (
+                        f"QUESTION: {question}\n\n"
+                        f"RESULT:\n{result.summary_text}"
+                    )
+                    parts = []
+                    for chunk in stream_response(
+                        explain_prompt,
+                        system=EXPLAINER_SYSTEM,
+                        max_tokens=_ANALYST_EXPLAIN_TOKENS,
+                    ):
+                        parts.append(chunk)
+                        content_area.markdown("".join(parts) + " ▮")
+                    explanation = "".join(parts)
+                    content_area.markdown(explanation)
+
         except (ConfigError, UsageLimitError) as exc:
-            msg = str(exc)
-            area.error(msg)
-            history.append({"role": "assistant", "content": f"Error: {msg}"})
+            status_area.empty()
+            content_area.error(str(exc))
+            explanation = f"Error: {exc}"
         except RuntimeError as exc:
-            msg = str(exc)
-            area.error(msg)
-            history.append({"role": "assistant", "content": f"Error: {msg}"})
+            status_area.empty()
+            content_area.error(str(exc))
+            explanation = f"Error: {exc}"
         except Exception as exc:
-            msg = f"Unexpected error: {exc}"
-            area.error(msg)
-            history.append({"role": "assistant", "content": f"Error: {msg}"})
+            status_area.empty()
+            content_area.error(f"Unexpected error: {exc}")
+            explanation = f"Error: {exc}"
+
+    history.append({
+        "role":         "assistant",
+        "content":      explanation,
+        "result_df":    result_df,
+        "result_chart": result_chart,
+        "plan_error":   plan_error,
+        "error":        exec_error,
+    })
 
 
 # ── Usage indicator ───────────────────────────────────────────────────────────

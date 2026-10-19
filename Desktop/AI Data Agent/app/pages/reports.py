@@ -74,7 +74,7 @@ def _generate_report(df, title, desc, stats, nulls, corr, head) -> None:
 
         if stats:
             sections.append("\n## Descriptive Statistics\n")
-            sections.append(describe(df).fillna("—").to_markdown())
+            sections.append(describe(df).astype(object).fillna("—").to_markdown())
 
         if nulls:
             sections.append("\n## Missing Value Analysis\n")

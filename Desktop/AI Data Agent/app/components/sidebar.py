@@ -73,15 +73,20 @@ def render_sidebar() -> str:
         if df is not None:
             lr = st.session_state.get("load_result")
             filename = getattr(lr, "filename", "") if lr else ""
-            st.markdown(f"""
-            <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);
-                        border-radius:6px;padding:8px 10px;margin-top:4px;">
-                <div style="color:#34d399;font-size:11px;font-weight:600;">✓ Dataset loaded</div>
-                <div style="color:#506070;font-size:11px;margin-top:2px;">
-                    {len(df):,} rows · {len(df.columns)} cols
-                </div>
-                {'<div style="color:#3d5060;font-size:10px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + filename + '">' + filename + '</div>' if filename else ''}
-            </div>""", unsafe_allow_html=True)
+            fname_html = (
+                f'<div style="color:#3d5060;font-size:10px;margin-top:1px;overflow:hidden;'
+                f'text-overflow:ellipsis;white-space:nowrap;" title="{filename}">{filename}</div>'
+                if filename else ""
+            )
+            st.markdown(
+                f'<div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);'
+                f'border-radius:6px;padding:8px 10px;margin-top:4px;">'
+                f'<div style="color:#34d399;font-size:11px;font-weight:600;">✓ Dataset loaded</div>'
+                f'<div style="color:#506070;font-size:11px;margin-top:2px;">'
+                f'{len(df):,} rows · {len(df.columns)} cols</div>'
+                f'{fname_html}</div>',
+                unsafe_allow_html=True,
+            )
 
         # ── Dashboard Filters (only on Dashboard page with data) ──────
         if page == "Dashboard" and df is not None:

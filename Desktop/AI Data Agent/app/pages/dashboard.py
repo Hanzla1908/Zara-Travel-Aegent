@@ -130,12 +130,10 @@ def _render_intel_banner(
 
     badge_html = " &nbsp;·&nbsp; ".join(parts)
     st.markdown(
-        f"""<div style="background:#f0f4f8;border-radius:8px;padding:10px 16px;
-                        font-size:13px;color:#1a2332;margin-bottom:16px;
-                        display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
-              <span>{badge_html}</span>
-              {filter_badge}
-            </div>""",
+        f'<div style="background:#f0f4f8;border-radius:8px;padding:10px 16px;'
+        f'font-size:13px;color:#1a2332;margin-bottom:16px;'
+        f'display:flex;align-items:center;flex-wrap:wrap;gap:6px;">'
+        f'<span>{badge_html}</span>{filter_badge}</div>',
         unsafe_allow_html=True,
     )
 
@@ -167,16 +165,14 @@ def _render_kpi_section(
                 if card.delta else ""
             )
             st.markdown(
-                f"""<div class="metric-card" style="position:relative;">
-                  <div style="font-size:22px;line-height:1;margin-bottom:2px;">{card.icon}</div>
-                  <div style="font-size:11px;color:#64748b;font-weight:500;text-transform:uppercase;
-                              letter-spacing:0.04em;margin-bottom:6px;">{card.label}</div>
-                  <div style="font-size:24px;font-weight:700;color:#1a2332;line-height:1.1;">
-                    {card.value}
-                  </div>
-                  {delta_html}
-                  <div style="font-size:10px;color:#94a3b8;margin-top:6px;">{card.sublabel}</div>
-                </div>""",
+                f'<div class="metric-card" style="position:relative;">'
+                f'<div style="font-size:22px;line-height:1;margin-bottom:2px;">{card.icon}</div>'
+                f'<div style="font-size:11px;color:#64748b;font-weight:500;text-transform:uppercase;'
+                f'letter-spacing:0.04em;margin-bottom:6px;">{card.label}</div>'
+                f'<div style="font-size:24px;font-weight:700;color:#1a2332;line-height:1.1;">{card.value}</div>'
+                f'{delta_html}'
+                f'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">{card.sublabel}</div>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
 

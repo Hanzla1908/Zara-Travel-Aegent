@@ -58,9 +58,17 @@ body, .stApp {
 /* ─── Hide Default Streamlit Chrome ─────────────────────────────────────────── */
 #MainMenu { display: none !important; }
 footer    { display: none !important; }
-[data-testid="stToolbar"] { display: none !important; }
-[data-testid="stDecoration"] { display: none !important; }
-[data-testid="stStatusWidget"] { display: none !important; }
+/* Hide Deploy button and Main Menu but NOT the sidebar expand/collapse toggle */
+[data-testid="stBaseButton-header"] { display: none !important; }
+[data-testid="stMainMenuButton"]    { display: none !important; }
+[data-testid="stDecoration"]        { display: none !important; }
+[data-testid="stStatusWidget"]      { display: none !important; }
+/* Keep toolbar transparent so the sidebar toggle remains clickable */
+[data-testid="stToolbar"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
 
 /* Top padding reduction */
 .block-container {

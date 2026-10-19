@@ -80,9 +80,9 @@ def build_options(df: pd.DataFrame, intel: ColumnIntel) -> dict:
         lo, hi = float(arr.min()), float(arr.max())
         rng = hi - lo
         step = max(rng / 200, 0.01)
-        # Round step nicely
-        if rng > 10000: step = round(step / 10) * 10
-        elif rng > 1000: step = round(step)
+        # Round step nicely; always keep as float so slider types match lo/hi
+        if rng > 10000: step = float(round(step / 10) * 10)
+        elif rng > 1000: step = float(round(step))
         elif rng > 100: step = round(step, 1)
         else: step = round(step, 2)
         step = max(step, 0.01)

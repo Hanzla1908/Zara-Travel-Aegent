@@ -9,13 +9,13 @@ def metric_card(label: str, value: str, delta: str = "", delta_type: str = "neut
     if delta:
         arrow = "▲" if delta_type == "positive" else ("▼" if delta_type == "negative" else "—")
         delta_html = f'<div class="mc-delta {delta_type}">{arrow} {delta}</div>'
-    st.markdown(f"""
-    <div class="metric-card">
-        {icon_html}
-        <div class="mc-label">{label}</div>
-        <div class="mc-value">{value}</div>
-        {delta_html}
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="metric-card">{icon_html}'
+        f'<div class="mc-label">{label}</div>'
+        f'<div class="mc-value">{value}</div>'
+        f'{delta_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def metric_row(metrics: list[dict]) -> None:
@@ -30,27 +30,26 @@ def metric_row(metrics: list[dict]) -> None:
         dt = m.get("delta_type", "neutral")
         arrow = "▲" if dt == "positive" else ("▼" if dt == "negative" else "—")
         delta_html = f'<div class="mc-delta {dt}">{arrow} {delta}</div>' if delta else ""
-        cards_html += f"""
-        <div class="metric-card">
-            {icon_html}
-            <div class="mc-label">{m["label"]}</div>
-            <div class="mc-value">{m["value"]}</div>
-            {delta_html}
-        </div>"""
+        cards_html += (
+            f'<div class="metric-card">'
+            f'{icon_html}'
+            f'<div class="mc-label">{m["label"]}</div>'
+            f'<div class="mc-value">{m["value"]}</div>'
+            f'{delta_html}'
+            f'</div>'
+        )
     st.markdown(f'<div class="metric-row">{cards_html}</div>', unsafe_allow_html=True)
 
 
 def content_card(title: str, subtitle: str = "", badge: str = "") -> None:
     badge_html = f'<span class="card-badge">{badge}</span>' if badge else ""
     subtitle_html = f'<div class="card-subtitle">{subtitle}</div>' if subtitle else ""
-    st.markdown(f"""
-    <div class="card-header">
-        <div>
-            <div class="card-title">{title}</div>
-            {subtitle_html}
-        </div>
-        {badge_html}
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="card-header"><div>'
+        f'<div class="card-title">{title}</div>{subtitle_html}'
+        f'</div>{badge_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def badge(text: str, style: str = "info") -> str:
@@ -60,11 +59,10 @@ def badge(text: str, style: str = "info") -> str:
 
 def page_header(title: str, subtitle: str = "") -> None:
     sub_html = f'<div class="page-subtitle">{subtitle}</div>' if subtitle else ""
-    st.markdown(f"""
-    <div class="page-header">
-        <div class="page-title">{title}</div>
-        {sub_html}
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="page-header"><div class="page-title">{title}</div>{sub_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def section_title(text: str) -> None:
@@ -72,9 +70,11 @@ def section_title(text: str) -> None:
 
 
 def empty_state(icon: str, title: str, desc: str) -> None:
-    st.markdown(f"""
-    <div class="empty-state">
-        <div class="es-icon">{icon}</div>
-        <div class="es-title">{title}</div>
-        <div class="es-desc">{desc}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="empty-state">'
+        f'<div class="es-icon">{icon}</div>'
+        f'<div class="es-title">{title}</div>'
+        f'<div class="es-desc">{desc}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )

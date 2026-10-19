@@ -78,6 +78,8 @@ def render() -> None:
     if intel.has_numerics:
         _render_distribution_section(filtered_df, intel)
 
+    _render_impact_section(filtered_df, intel)
+
     all_num = intel.kpi_cols + intel.mean_cols + intel.dist_cols
     if len(all_num) >= 3:
         _render_correlation_section(filtered_df, intel)
@@ -129,12 +131,11 @@ def _render_intel_banner(
         )
 
     badge_html = " &nbsp;·&nbsp; ".join(parts)
-    st.markdown(
+    st.html(
         f'<div style="background:#f0f4f8;border-radius:8px;padding:10px 16px;'
         f'font-size:13px;color:#1a2332;margin-bottom:16px;'
         f'display:flex;align-items:center;flex-wrap:wrap;gap:6px;">'
-        f'<span>{badge_html}</span>{filter_badge}</div>',
-        unsafe_allow_html=True,
+        f'<span>{badge_html}</span>{filter_badge}</div>'
     )
 
     if intel.datetime_as_string:
@@ -164,7 +165,7 @@ def _render_kpi_section(
                 f'{card.delta}</div>'
                 if card.delta else ""
             )
-            st.markdown(
+            st.html(
                 f'<div class="metric-card" style="position:relative;">'
                 f'<div style="font-size:22px;line-height:1;margin-bottom:2px;">{card.icon}</div>'
                 f'<div style="font-size:11px;color:#64748b;font-weight:500;text-transform:uppercase;'
@@ -172,8 +173,7 @@ def _render_kpi_section(
                 f'<div style="font-size:24px;font-weight:700;color:#1a2332;line-height:1.1;">{card.value}</div>'
                 f'{delta_html}'
                 f'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">{card.sublabel}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
+                f'</div>'
             )
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
@@ -343,6 +343,129 @@ def _render_correlation_section(df: pd.DataFrame, intel: ColumnIntel) -> bool:
                 st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
             else:
                 st.info("Not enough data points for a scatter chart.")
+    return True
+
+
+# ── Impact / epidemic metrics section ────────────────────────────────────────
+
+_DEATH_KW    = {"dead", "death", "deaths", "fatal", "kill", "deceased", "mortal"}
+_ALIVE_KW    = {"alive", "surviv", "recover", "discharg"}
+_AFFECTED_KW = {"affect", "confirm", "case", "infect", "effect", "positive", "total"}
+
+
+def _impact_cols(df: pd.DataFrame) -> tuple[list, list, list]:
+    """Return (dead_cols, alive_cols, affected_cols) from df column names."""
+    def _match(col: str, kws: set) -> bool:
+        cl = col.lower()
+        return any(k in cl for k in kws)
+
+    numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    dead    = [c for c in numeric_cols if _match(c, _DEATH_KW)]
+    alive   = [c for c in numeric_cols if _match(c, _ALIVE_KW)]
+    affect  = [c for c in numeric_cols if _match(c, _AFFECTED_KW) and c not in dead and c not in alive]
+    return dead, alive, affect
+
+
+def _render_impact_section(df: pd.DataFrame, intel: ColumnIntel) -> bool:
+    """Show impact/epidemic metrics (dead, alive, affected) when detected."""
+    import plotly.graph_objects as go
+
+    dead_cols, alive_cols, affect_cols = _impact_cols(df)
+    picked = dead_cols[:2] + alive_cols[:2] + affect_cols[:2]
+    if not picked:
+        return False
+
+    section_title("Impact Metrics")
+
+    color_map: dict[str, str] = {}
+    for c in dead_cols[:2]:   color_map[c] = "#ef4444"
+    for c in alive_cols[:2]:  color_map[c] = "#10b981"
+    for c in affect_cols[:2]: color_map[c] = "#f59e0b"
+
+    # ── Summary stat cards ────────────────────────────────────────────────
+    stat_cols = st.columns(min(len(picked), 4))
+    for i, col_name in enumerate(picked[:4]):
+        series = pd.to_numeric(df[col_name], errors="coerce")
+        total  = series.sum()
+        color  = color_map.get(col_name, "#2563eb")
+        label  = col_name.replace("_", " ").replace("-", " ").title()
+        val_str = f"{total:,.0f}" if total >= 1 else f"{total:.4f}"
+        with stat_cols[i]:
+            st.html(
+                f'<div class="metric-card" style="border-top:3px solid {color};">'
+                f'<div style="font-size:11px;color:#64748b;font-weight:600;'
+                f'text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">{label}</div>'
+                f'<div style="font-size:22px;font-weight:700;color:{color};">{val_str}</div>'
+                f'<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Total</div>'
+                f'</div>'
+            )
+
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    # ── Comparison bar chart ──────────────────────────────────────────────
+    totals = {c: float(pd.to_numeric(df[c], errors="coerce").sum()) for c in picked[:6]}
+    bar_colors = [color_map.get(c, "#2563eb") for c in totals]
+    labels     = [c.replace("_", " ").title() for c in totals]
+
+    fig = go.Figure(go.Bar(
+        x=labels,
+        y=list(totals.values()),
+        marker_color=bar_colors,
+        text=[f"{v:,.0f}" for v in totals.values()],
+        textposition="outside",
+    ))
+    fig.update_layout(
+        height=300,
+        margin=dict(t=30, b=10, l=10, r=10),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(size=11, color="#374151"),
+        showlegend=False,
+        yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.06)", zeroline=False),
+        xaxis=dict(showgrid=False),
+    )
+
+    # ── Pie / donut breakdown (if we have dead + at least one other) ──────
+    if dead_cols and (alive_cols or affect_cols):
+        c1, c2 = st.columns([3, 2])
+        with c1:
+            st.caption("**Totals comparison**")
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        with c2:
+            st.caption("**Proportional breakdown**")
+            pie_labels = [c.replace("_", " ").title() for c in picked[:4]]
+            pie_vals   = [totals[c] for c in picked[:4]]
+            pie_colors = [color_map.get(c, "#2563eb") for c in picked[:4]]
+            fig2 = go.Figure(go.Pie(
+                labels=pie_labels,
+                values=pie_vals,
+                hole=0.45,
+                marker_colors=pie_colors,
+                textinfo="label+percent",
+                textfont_size=11,
+            ))
+            fig2.update_layout(
+                height=300,
+                margin=dict(t=10, b=10, l=10, r=10),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+            )
+            st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+    else:
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    # ── Time trend for impact cols (if date column exists) ────────────────
+    if intel.primary_date and intel.primary_date in df.columns and len(picked) >= 1:
+        with st.expander("Impact over time"):
+            trend_cols = picked[:3]
+            fig3 = cf.time_series_multi(df, intel.primary_date, trend_cols)
+            if fig3 is None and len(trend_cols) >= 1:
+                agg = "sum"
+                fig3 = cf.time_series(df, intel.primary_date, trend_cols[0], agg=agg)
+            if fig3:
+                st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+
     return True
 
 

@@ -9,12 +9,11 @@ def metric_card(label: str, value: str, delta: str = "", delta_type: str = "neut
     if delta:
         arrow = "▲" if delta_type == "positive" else ("▼" if delta_type == "negative" else "—")
         delta_html = f'<div class="mc-delta {delta_type}">{arrow} {delta}</div>'
-    st.markdown(
+    st.html(
         f'<div class="metric-card">{icon_html}'
         f'<div class="mc-label">{label}</div>'
         f'<div class="mc-value">{value}</div>'
-        f'{delta_html}</div>',
-        unsafe_allow_html=True,
+        f'{delta_html}</div>'
     )
 
 
@@ -38,17 +37,16 @@ def metric_row(metrics: list[dict]) -> None:
             f'{delta_html}'
             f'</div>'
         )
-    st.markdown(f'<div class="metric-row">{cards_html}</div>', unsafe_allow_html=True)
+    st.html(f'<div class="metric-row">{cards_html}</div>')
 
 
 def content_card(title: str, subtitle: str = "", badge: str = "") -> None:
     badge_html = f'<span class="card-badge">{badge}</span>' if badge else ""
     subtitle_html = f'<div class="card-subtitle">{subtitle}</div>' if subtitle else ""
-    st.markdown(
+    st.html(
         f'<div class="card-header"><div>'
         f'<div class="card-title">{title}</div>{subtitle_html}'
-        f'</div>{badge_html}</div>',
-        unsafe_allow_html=True,
+        f'</div>{badge_html}</div>'
     )
 
 
@@ -59,22 +57,20 @@ def badge(text: str, style: str = "info") -> str:
 
 def page_header(title: str, subtitle: str = "") -> None:
     sub_html = f'<div class="page-subtitle">{subtitle}</div>' if subtitle else ""
-    st.markdown(
-        f'<div class="page-header"><div class="page-title">{title}</div>{sub_html}</div>',
-        unsafe_allow_html=True,
+    st.html(
+        f'<div class="page-header"><div class="page-title">{title}</div>{sub_html}</div>'
     )
 
 
 def section_title(text: str) -> None:
-    st.markdown(f'<div class="section-title">{text}</div>', unsafe_allow_html=True)
+    st.html(f'<div class="section-title">{text}</div>')
 
 
 def empty_state(icon: str, title: str, desc: str) -> None:
-    st.markdown(
+    st.html(
         f'<div class="empty-state">'
         f'<div class="es-icon">{icon}</div>'
         f'<div class="es-title">{title}</div>'
         f'<div class="es-desc">{desc}</div>'
-        f'</div>',
-        unsafe_allow_html=True,
+        f'</div>'
     )

@@ -24,6 +24,7 @@ export default function ChatWindow() {
   const [typing, setTyping]     = useState(false)
   const messagesRef             = useRef(null)
 
+  // Scroll within the messages container only — never scrollIntoView which moves the whole page
   useEffect(() => {
     const el = messagesRef.current
     if (el) el.scrollTop = el.scrollHeight
